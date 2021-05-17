@@ -26,12 +26,59 @@ type Regex struct {
 }
 
 type Flags struct {
-	isInvert              bool
-	isIgnoreCase          bool
-	isFile                bool
-	isFileAndLine         bool
-	isFileAndLineAndMatch bool
-	isNormal              bool
+	isInvert                    bool
+	isIgnoreCase                bool
+	isFile                      bool
+	isFileAndLineNumber         bool
+	isFileAndLineNumberAndMatch bool
+	isNormal                    bool
+}
+
+type Match struct {
+	curOutput    string
+	lineNumber   int
+	filePath     string
+	line         string
+	foundMatches []string
+}
+
+func normalOutput() func(match *Match) string {
+	return func(match *Match) string {
+		match.line = colorString(match.line, "red", match.foundMatches)
+		return fmt.Sprintf("%s%s:%s\n", match.curOutput, match.filePath, match.line)
+	}
+}
+
+func fileOutput() func(match *Match) string {
+	return func(match *Match) string {
+		return fmt.Sprintf("%s%s\n", match.curOutput, match.filePath)
+	}
+}
+
+func fileAndLineNumberOutput() func(match *Match) string {
+	return func(match *Match) string {
+		return fmt.Sprintf("%s%s:%d\n", match.curOutput, match.filePath, match.lineNumber)
+	}
+}
+
+func fileAndLineNumberAndMatchOutput() func(match *Match) string {
+	return func(match *Match) string {
+		match.line = colorString(match.line, "red", match.foundMatches)
+		return fmt.Sprintf("%s%s:%d:%s\n", match.curOutput, match.filePath, match.lineNumber, match.line)
+	}
+}
+
+func chooseOperation(flags *Flags) func(match *Match) string {
+
+	if flags.isFile {
+		return fileOutput()
+	} else if flags.isFileAndLineNumber {
+		return fileAndLineNumberOutput()
+	} else if flags.isFileAndLineNumberAndMatch {
+		return fileAndLineNumberAndMatchOutput()
+	} else {
+		return normalOutput()
+	}
 }
 
 // find any kind of regex in a list of files and return grep style output
@@ -42,6 +89,8 @@ func findRegexInFiles(filesPaths []string, pattern string, flags *Flags) string 
 	if flags.isIgnoreCase {
 		pattern = fmt.Sprintf("(?i)%s", pattern)
 	}
+
+	operation := chooseOperation(flags)
 
 	re := regexp.MustCompile(pattern)
 
@@ -55,35 +104,20 @@ func findRegexInFiles(filesPaths []string, pattern string, flags *Flags) string 
 		for scanner.Scan() {
 			line := scanner.Text()
 
-			matches := re.FindAllString(line, -1)
-			numOfMatches := len(matches)
-
-			if numOfMatches > 0 {
-				line = colorString(line, "red", matches)
+			regexMatches := re.FindAllString(line, -1)
+			numOfMatches := len(regexMatches)
+			match := &Match{
+				curOutput:    output,
+				lineNumber:   lineNumber,
+				filePath:     filePath,
+				line:         line,
+				foundMatches: regexMatches,
 			}
 
-			if flags.isNormal {
-				if (numOfMatches > 0 && !flags.isInvert) || (numOfMatches == 0 && flags.isInvert) {
-					output = fmt.Sprintf("%s%s:%s\n", output, filePath, line)
-				}
-			}
-
-			if flags.isFile {
-				if (numOfMatches > 0 && !flags.isInvert) || (numOfMatches == 0 && flags.isInvert) {
-					output = fmt.Sprintf("%s%s\n", output, filePath)
+			if (numOfMatches > 0 && !flags.isInvert) || (numOfMatches == 0 && flags.isInvert) {
+				output = operation(match)
+				if flags.isFile {
 					break
-				}
-			}
-
-			if flags.isFileAndLine {
-				if (numOfMatches > 0 && !flags.isInvert) || (numOfMatches == 0 && flags.isInvert) {
-					output = fmt.Sprintf("%s%s:%d\n", output, filePath, lineNumber)
-				}
-			}
-
-			if flags.isFileAndLineAndMatch {
-				if (numOfMatches > 0 && !flags.isInvert) || (numOfMatches == 0 && flags.isInvert) {
-					output = fmt.Sprintf("%s%s:%d:%s\n", output, filePath, lineNumber, line)
 				}
 			}
 
@@ -97,7 +131,6 @@ func findRegexInFiles(filesPaths []string, pattern string, flags *Flags) string 
 
 	return output
 }
-
 
 // color all the matching substrings that were found on a one line.
 // returns that line where its matching substrings have been colored.

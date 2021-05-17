@@ -74,9 +74,9 @@ func parseGrepArgs() (*Regex, *Flags) {
 	flags.isIgnoreCase = *ignoreCase
 	flags.isInvert = *invert
 	flags.isFile = *filesWithMatches
-	flags.isFileAndLine = *count && !flags.isFile
-	flags.isFileAndLineAndMatch = *linesAndFiles && !flags.isFile && !flags.isFileAndLine
-	flags.isNormal = !flags.isFile && !flags.isFileAndLineAndMatch && !flags.isFileAndLine
+	flags.isFileAndLineNumber = *count && !flags.isFile
+	flags.isFileAndLineNumberAndMatch = *linesAndFiles && !flags.isFile && !flags.isFileAndLineNumber
+	flags.isNormal = !flags.isFile && !flags.isFileAndLineNumberAndMatch && !flags.isFileAndLineNumber
 
 	return regex, flags
 }
